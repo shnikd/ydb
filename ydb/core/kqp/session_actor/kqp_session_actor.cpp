@@ -16,6 +16,7 @@
 #include <ydb/core/kqp/provider/yql_kikimr_results.h>
 #include <ydb/core/kqp/rm_service/kqp_snapshot_manager.h>
 #include <ydb/core/ydb_convert/ydb_convert.h>
+#include <ydb/core/tx/schemeshard/schemeshard.h>
 #include <ydb/public/lib/operation_id/operation_id.h>
 
 #include <ydb/core/util/ulid.h>
@@ -1162,7 +1163,8 @@ public:
         }
     }
 
-    std::optional<TKqpTempTablesState::TTempTableInfo> GetTemporaryTableInfo(TKqpPhyTxHolder::TConstPtr tx) {
+    std::optional<std::pair<bool, TKqpTempTablesState::TTempTableInfo>>
+    GetTemporaryTableInfo(TKqpPhyTxHolder::TConstPtr tx) {
         if (!tx) {
             return std::nullopt;
         }
@@ -1186,10 +1188,27 @@ public:
                 auto userToken = QueryState ? QueryState->UserToken : TIntrusiveConstPtr<NACLib::TUserToken>();
                 if (tableDesc->HasTemporary()) {
                     if (tableDesc->GetTemporary()) {
-                        return {{tableDesc->GetName(), modifyScheme.GetWorkingDir(), Settings.Cluster, userToken, Settings.Database}};
+                        return {{true, {tableDesc->GetName(), modifyScheme.GetWorkingDir(), Settings.Cluster, userToken, Settings.Database}}};
                     }
                 }
                 break;
+            }
+            case NKqpProto::TKqpSchemeOperation::kDropTable: {
+                auto modifyScheme = schemeOperation.GetDropTable();
+                auto* dropTable = modifyScheme.MutableDrop();
+
+                auto name = dropTable->GetName();
+                auto pos = name.find(SessionId);
+                if (pos == TString::npos) {
+                    return std::nullopt;
+                }
+                name.erase(pos, name.size());
+
+                auto it = TempTablesState.TempTables.find(std::make_pair(Settings.Database, JoinPath({modifyScheme.GetWorkingDir(), name})));
+                if (it == TempTablesState.TempTables.end()) {
+                    return std::nullopt;
+                }
+                return {{false, it->second}};
             }
             default:
                 return std::nullopt;
@@ -1205,8 +1224,15 @@ public:
         if (!tx) {
             return;
         }
-        if (auto tempTableInfo = GetTemporaryTableInfo(tx)) {
-            TempTablesState.TempTables[std::make_pair(tempTableInfo->Database, JoinPath({tempTableInfo->WorkingDir, tempTableInfo->Name}))] = std::move(*tempTableInfo);
+
+        auto optInfo = GetTemporaryTableInfo(tx);
+        if (optInfo) {
+            auto [isCreate, tempTableInfo] = *optInfo;
+            if (isCreate) {
+                TempTablesState.TempTables[std::make_pair(tempTableInfo.Database, JoinPath({tempTableInfo.WorkingDir, tempTableInfo.Name}))] = std::move(tempTableInfo);
+            } else {
+                TempTablesState.TempTables.erase(std::make_pair(tempTableInfo.Database, JoinPath({tempTableInfo.WorkingDir, tempTableInfo.Name})));
+            }
             QueryState->UpdateTempTablesState(TempTablesState);
         }
     }
@@ -2000,6 +2026,7 @@ public:
                 hFunc(NYql::NDq::TEvDq::TEvAbortExecution, HandleNoop);
                 hFunc(TEvTxUserProxy::TEvAllocateTxIdResult, HandleNoop);
 
+                hFunc(NSchemeShard::TEvSchemeShard::TEvSessionActorAck, HandleNoop);
             default:
                 UnexpectedEvent("ReadyState", ev);
             }
@@ -2039,6 +2066,8 @@ public:
 
                 // always come from WorkerActor
                 hFunc(TEvKqp::TEvQueryResponse, ForwardResponse);
+
+                hFunc(NSchemeShard::TEvSchemeShard::TEvSessionActorAck, HandleNoop);
             default:
                 UnexpectedEvent("ExecuteState", ev);
             }
@@ -2076,6 +2105,8 @@ public:
                 hFunc(TEvKqp::TEvCloseSessionResponse, HandleCleanup);
                 hFunc(TEvKqp::TEvQueryResponse, HandleNoop);
                 hFunc(TEvKqpExecuter::TEvExecuterProgress, HandleNoop)
+
+                hFunc(NSchemeShard::TEvSchemeShard::TEvSessionActorAck, HandleNoop);
             default:
                 UnexpectedEvent("CleanupState", ev);
             }
