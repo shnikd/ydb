@@ -402,6 +402,8 @@ struct TTableInfo : public TSimpleRefCount<TTableInfo> {
     THashMap<ui32, TColumn> Columns;
     TVector<ui32> KeyColumnIds;
     bool IsBackup = false;
+    bool IsTemporary = false;
+    TString OwnerActorId;
 
     TAlterTableInfo::TPtr AlterData;
 
@@ -2193,7 +2195,7 @@ private:
     TPathId ResourcesDomainId;
     TTabletId SharedHive = InvalidTabletId;
     TMaybeServerlessComputeResourcesMode ServerlessComputeResourcesMode;
-    
+
     NLoginProto::TSecurityState SecurityState;
     ui64 SecurityStateVersion = 0;
 
