@@ -1816,10 +1816,10 @@ struct TSchemeShard::TTxInit : public TTransactionBase<TSchemeShard> {
                     if (it == tempTablesBySession.end()) {
                         auto& currentTempTables = tempTablesBySession[sessionActorId];
                         currentTempTables.insert(TTempTableId{
-                            tempTableWorkingDir, tempTableName, Nothing()});
+                            tempTableWorkingDir, tempTableName});
                     } else {
                         it->second.insert(TTempTableId{
-                                tempTableWorkingDir, tempTableName, Nothing()});
+                                tempTableWorkingDir, tempTableName});
                     }
                 }
 
