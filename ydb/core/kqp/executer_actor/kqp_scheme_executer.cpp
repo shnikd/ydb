@@ -107,7 +107,7 @@ public:
                     }
                     tableDesc->SetName(tableDesc->GetName() + SessionId);
                     tableDesc->SetPath(tableDesc->GetPath() + SessionId);
-                    tableDesc->SetSessionActorId(Target.ToString());
+                    tableDesc->SetOwnerActorId(Target.ToString());
                 }
                 ev->Record.MutableTransaction()->MutableModifyScheme()->CopyFrom(modifyScheme);
                 break;
@@ -118,7 +118,7 @@ public:
                 if (Temporary) {
                     auto* dropTable = modifyScheme.MutableDrop();
                     dropTable->SetTemporary(true);
-                    dropTable->SetSessionActorId(Target.ToString());
+                    dropTable->SetOwnerActorId(Target.ToString());
                 }
                 ev->Record.MutableTransaction()->MutableModifyScheme()->CopyFrom(modifyScheme);
                 break;

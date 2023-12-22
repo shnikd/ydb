@@ -62,7 +62,7 @@ public:
             auto* drop = modifyScheme->MutableDrop();
             if (TempTablesState.SessionId) {
                 drop->SetName(info.Name + *TempTablesState.SessionId);
-                drop->SetSessionActorId(*TempTablesState.SessionId);
+                drop->SetOwnerActorId(*TempTablesState.SessionId);
                 drop->SetTemporary(true);
             }
 
