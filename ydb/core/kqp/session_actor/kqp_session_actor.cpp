@@ -1198,15 +1198,17 @@ public:
             case NKqpProto::TKqpSchemeOperation::kDropTable: {
                 auto modifyScheme = schemeOperation.GetDropTable();
                 auto* dropTable = modifyScheme.MutableDrop();
+                YQL_ENSURE(TempTablesState.SessionId, "Empty TempTablesState.SessionId");
 
-                auto name = dropTable->GetName();
-                auto pos = name.find(SessionId);
+                TString name = dropTable->GetName();
+                auto pos = name.find(*TempTablesState.SessionId);
+
                 if (pos == TString::npos) {
                     return std::nullopt;
                 }
                 name.erase(pos, name.size());
 
-                auto it = TempTablesState.TempTables.find(std::make_pair(Settings.Database, JoinPath({modifyScheme.GetWorkingDir(), name})));
+                auto it = TempTablesState.TempTables.find(std::make_pair(Settings.Cluster, JoinPath({modifyScheme.GetWorkingDir(), name})));
                 if (it == TempTablesState.TempTables.end()) {
                     return std::nullopt;
                 }
@@ -1231,7 +1233,7 @@ public:
         if (optInfo) {
             auto [isCreate, tempTableInfo] = *optInfo;
             if (isCreate) {
-                TempTablesState.TempTables[std::make_pair(tempTableInfo.Database, JoinPath({tempTableInfo.WorkingDir, tempTableInfo.Name}))] = std::move(tempTableInfo);
+                TempTablesState.TempTables[std::make_pair(tempTableInfo.Database, JoinPath({tempTableInfo.WorkingDir, tempTableInfo.Name}))] = tempTableInfo;
             } else {
                 TempTablesState.TempTables.erase(std::make_pair(tempTableInfo.Database, JoinPath({tempTableInfo.WorkingDir, tempTableInfo.Name})));
             }

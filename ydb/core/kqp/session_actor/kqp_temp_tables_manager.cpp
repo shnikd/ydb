@@ -62,11 +62,12 @@ public:
             modifyScheme->SetWorkingDir(info.WorkingDir);
             modifyScheme->SetOperationType(NKikimrSchemeOp::EOperationType::ESchemeOpDropTable);
             auto* drop = modifyScheme->MutableDrop();
-            if (TempTablesState.SessionId) {
-                drop->SetName(info.Name + *TempTablesState.SessionId);
-                drop->SetOwnerActorId(KqpTempTablesAgentActor.ToString());
-                drop->SetTemporary(true);
-            }
+
+            YQL_ENSURE(TempTablesState.SessionId, "Empty TempTablesState.SessionId");
+
+            drop->SetName(info.Name + *TempTablesState.SessionId);
+            drop->SetOwnerActorId(KqpTempTablesAgentActor.ToString());
+            drop->SetTemporary(true);
 
             auto promise = NewPromise<IKqpGateway::TGenericResult>();
             IActor* requestHandler = new TSchemeOpRequestHandler(ev.Release(), promise, true);
