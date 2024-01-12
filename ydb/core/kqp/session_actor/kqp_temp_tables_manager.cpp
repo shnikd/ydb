@@ -40,10 +40,9 @@ public:
     }
 
     TKqpTempTablesManager(
-        TKqpTempTablesState tempTablesState, const TActorId& target, const TActorId& kqpTempTablesAgentActor)
+        TKqpTempTablesState tempTablesState, const TActorId& target)
         : TempTablesState(std::move(tempTablesState))
         , Target(target)
-        , KqpTempTablesAgentActor(kqpTempTablesAgentActor)
     {}
 
     void Bootstrap() {
@@ -66,8 +65,6 @@ public:
             YQL_ENSURE(TempTablesState.SessionId, "Empty TempTablesState.SessionId");
 
             drop->SetName(info.Name + *TempTablesState.SessionId);
-            drop->SetOwnerActorId(KqpTempTablesAgentActor.ToString());
-            drop->SetTemporary(true);
 
             auto promise = NewPromise<IKqpGateway::TGenericResult>();
             IActor* requestHandler = new TSchemeOpRequestHandler(ev.Release(), promise, true);
@@ -112,16 +109,15 @@ public:
 private:
     TKqpTempTablesState TempTablesState;
     const TActorId Target;
-    const TActorId KqpTempTablesAgentActor;
     ui32 ResultsCount = 0;
 };
 
 } // namespace
 
 IActor* CreateKqpTempTablesManager(
-    TKqpTempTablesState tempTablesState, const TActorId& target, const TActorId& kqpTempTablesAgentActor)
+    TKqpTempTablesState tempTablesState, const TActorId& target)
 {
-    return new TKqpTempTablesManager(tempTablesState, target, kqpTempTablesAgentActor);
+    return new TKqpTempTablesManager(tempTablesState, target);
 }
 
 } // namespace NKikimr::NKqp

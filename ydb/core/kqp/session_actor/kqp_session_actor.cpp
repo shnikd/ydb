@@ -1912,7 +1912,7 @@ public:
 
             LOG_D("Cleanup temp tables: " << TempTablesState.TempTables.size());
             auto tempTablesManager = CreateKqpTempTablesManager(
-                std::move(TempTablesState), SelfId(), KqpTempTablesAgentActor);
+                std::move(TempTablesState), SelfId());
             RegisterWithSameMailbox(tempTablesManager);
             return;
         } else {

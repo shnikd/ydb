@@ -112,7 +112,7 @@ public:
                     tableDesc->SetPath(tableDesc->GetPath() + SessionId);
                     YQL_ENSURE(KqpTempTablesAgentActor != TActorId(),
                         "Create temp table with empty KqpTempTablesAgentActor");
-                    tableDesc->SetOwnerActorId(KqpTempTablesAgentActor.ToString());
+                    ActorIdToProto(KqpTempTablesAgentActor, modifyScheme.MutableTempTableOwnerActorId());
                 }
                 ev->Record.MutableTransaction()->MutableModifyScheme()->CopyFrom(modifyScheme);
                 break;
@@ -120,13 +120,6 @@ public:
 
             case NKqpProto::TKqpSchemeOperation::kDropTable: {
                 auto modifyScheme = schemeOp.GetDropTable();
-                if (Temporary) {
-                    auto* dropTable = modifyScheme.MutableDrop();
-                    dropTable->SetTemporary(true);
-                    YQL_ENSURE(KqpTempTablesAgentActor != TActorId(),
-                        "Drop temp table with empty KqpTempTablesAgentActor");
-                    dropTable->SetOwnerActorId(KqpTempTablesAgentActor.ToString());
-                }
                 ev->Record.MutableTransaction()->MutableModifyScheme()->CopyFrom(modifyScheme);
                 break;
             }
