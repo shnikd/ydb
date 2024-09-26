@@ -1599,6 +1599,7 @@ TPathElement::EPathState TSchemeShard::CalcPathState(TTxState::ETxType txType, T
         Y_UNREACHABLE();
     case TTxState::TxMoveTable:
     case TTxState::TxMoveTableIndex:
+    case TTxState::TxMoveSequence:
         return TPathElement::EPathState::EPathStateCreate;
     case TTxState::TxRestoreIncrementalBackupAtTable:
         return TPathElement::EPathState::EPathStateOutgoingIncrementalRestore;
