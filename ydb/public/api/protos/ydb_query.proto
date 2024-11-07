@@ -172,6 +172,8 @@ message ExecuteQueryRequest {
     int64 response_part_limit_bytes = 9 [(Ydb.value) = "[0; 33554432]"];
 
     string pool_id = 10; // Workload manager pool id
+
+    bool collect_full_diagnostics = 11;
 }
 
 message ResultSetMeta {
@@ -191,6 +193,9 @@ message ExecuteQueryResponsePart {
     Ydb.TableStats.QueryStats exec_stats = 5;
 
     TransactionMeta tx_meta = 6;
+
+    // Full query diagnostics
+    string query_full_diagnostics = 7;
 }
 
 message ExecuteScriptRequest {

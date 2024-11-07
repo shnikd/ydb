@@ -2156,13 +2156,15 @@ TTableDescription TDescribeTableResult::GetTableDescription() const {
 ////////////////////////////////////////////////////////////////////////////////
 
 TDataQueryResult::TDataQueryResult(TStatus&& status, TVector<TResultSet>&& resultSets,
-    const TMaybe<TTransaction>& transaction, const TMaybe<TDataQuery>& dataQuery, bool fromCache, const TMaybe<TQueryStats> &queryStats)
+    const TMaybe<TTransaction>& transaction, const TMaybe<TDataQuery>& dataQuery, bool fromCache, const TMaybe<TQueryStats> &queryStats,
+    TString&& diagnostics)
     : TStatus(std::move(status))
     , Transaction_(transaction)
     , ResultSets_(std::move(resultSets))
     , DataQuery_(dataQuery)
     , FromCache_(fromCache)
     , QueryStats_(queryStats)
+    , Diagnostics_(std::move(diagnostics))
 {}
 
 const TVector<TResultSet>& TDataQueryResult::GetResultSets() const {
@@ -2207,6 +2209,11 @@ const TString TDataQueryResult::GetQueryPlan() const {
     } else {
         return "";
     }
+}
+
+const TString& TDataQueryResult::GetDiagnostics() const {
+    CheckStatusOk("TDataQueryResult::GetDiagnostics");
+    return Diagnostics_;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
