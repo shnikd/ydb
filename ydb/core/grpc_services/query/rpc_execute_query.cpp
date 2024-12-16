@@ -260,7 +260,8 @@ private:
             .SetUseCancelAfter(false)
             .SetSyntax(syntax)
             .SetSupportStreamTrailingResult(true)
-            .SetOutputChunkMaxSize(req->response_part_limit_bytes());
+            .SetOutputChunkMaxSize(req->response_part_limit_bytes())
+            .SetCollectFullDiagnostics(req->Getcollect_full_diagnostics());
 
         auto ev = MakeHolder<NKqp::TEvKqp::TEvQueryRequest>(
             QueryAction,
@@ -276,8 +277,7 @@ private:
             cachePolicy,
             nullptr, // operationParams
             settings,
-            req->pool_id(),
-            req->Getcollect_full_diagnostics());
+            req->pool_id());
 
         if (!ctx.Send(NKqp::MakeKqpProxyID(ctx.SelfID.NodeId()), ev.Release(), 0, 0, Span_.GetTraceId())) {
             NYql::TIssues issues;
