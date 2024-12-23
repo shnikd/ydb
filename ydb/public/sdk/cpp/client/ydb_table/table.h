@@ -1164,9 +1164,6 @@ struct TStreamExecScanQuerySettings : public TRequestSettings<TStreamExecScanQue
 
     // Collect runtime statistics with a given detalization mode
     FLUENT_SETTING_DEFAULT(ECollectQueryStatsMode, CollectQueryStats, ECollectQueryStatsMode::None);
-
-    // Collect full query compilation diagnostics
-    FLUENT_SETTING_DEFAULT(bool, CollectFullDiagnostics, false);
 };
 
 class TSession;
@@ -1713,8 +1710,6 @@ struct TExecDataQuerySettings : public TOperationRequestSettings<TExecDataQueryS
     FLUENT_SETTING_OPTIONAL(bool, KeepInQueryCache);
 
     FLUENT_SETTING_OPTIONAL(ECollectQueryStatsMode, CollectQueryStats);
-
-    FLUENT_SETTING_DEFAULT(bool, CollectFullDiagnostics, false);
 };
 
 struct TExecSchemeQuerySettings : public TOperationRequestSettings<TExecSchemeQuerySettings> {};
@@ -2017,7 +2012,7 @@ private:
 class TDataQueryResult : public TStatus {
 public:
     TDataQueryResult(TStatus&& status, TVector<TResultSet>&& resultSets, const TMaybe<TTransaction>& transaction,
-        const TMaybe<TDataQuery>& dataQuery, bool fromCache, const TMaybe<TQueryStats>& queryStats, TString&& diagnostics);
+        const TMaybe<TDataQuery>& dataQuery, bool fromCache, const TMaybe<TQueryStats>& queryStats);
 
     const TVector<TResultSet>& GetResultSets() const;
     TVector<TResultSet> ExtractResultSets() &&;
@@ -2034,7 +2029,7 @@ public:
 
     const TString GetQueryPlan() const;
 
-    const TString& GetDiagnostics() const;
+    const TString GetDiagnostics() const;
 
 private:
     TMaybe<TTransaction> Transaction_;
@@ -2042,7 +2037,6 @@ private:
     TMaybe<TDataQuery> DataQuery_;
     bool FromCache_;
     TMaybe<TQueryStats> QueryStats_;
-    TString Diagnostics_;
 };
 
 class TReadTableSnapshot {
@@ -2109,31 +2103,24 @@ public:
     const TQueryStats& GetQueryStats() const { return *QueryStats_; }
     TQueryStats ExtractQueryStats() { return std::move(*QueryStats_); }
 
-    bool HasDiagnostics() const { return Diagnostics_.Defined(); }
-    const TString& GetDiagnostics() const { return *Diagnostics_; }
-    TString&& ExtractDiagnostics() { return std::move(*Diagnostics_); }
-
     TScanQueryPart(TStatus&& status)
         : TStreamPartStatus(std::move(status))
     {}
 
-    TScanQueryPart(TStatus&& status, const TMaybe<TQueryStats>& queryStats, const TMaybe<TString>& diagnostics)
+    TScanQueryPart(TStatus&& status, const TMaybe<TQueryStats>& queryStats)
         : TStreamPartStatus(std::move(status))
         , QueryStats_(queryStats)
-        , Diagnostics_(diagnostics)
     {}
 
-    TScanQueryPart(TStatus&& status, TResultSet&& resultSet, const TMaybe<TQueryStats>& queryStats, const TMaybe<TString>& diagnostics)
+    TScanQueryPart(TStatus&& status, TResultSet&& resultSet, const TMaybe<TQueryStats>& queryStats)
         : TStreamPartStatus(std::move(status))
         , ResultSet_(std::move(resultSet))
         , QueryStats_(queryStats)
-        , Diagnostics_(diagnostics)
     {}
 
 private:
     TMaybe<TResultSet> ResultSet_;
     TMaybe<TQueryStats> QueryStats_;
-    TMaybe<TString> Diagnostics_;
 };
 
 using TAsyncScanQueryPart = NThreading::TFuture<TScanQueryPart>;
