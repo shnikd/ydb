@@ -21,6 +21,8 @@ namespace NSequenceProxy {
             EvNextValResult,
             EvSetVal,
             EvSetValResult,
+            EvCurrVal,
+            EvCurrValResult,
             EvEnd,
         };
 
@@ -65,6 +67,39 @@ namespace NSequenceProxy {
             { }
 
             TEvNextValResult(const TPathId& pathId, i64 value)
+                : Status(Ydb::StatusIds::SUCCESS)
+                , PathId(pathId)
+                , Value(value)
+            { }
+        };
+
+        struct TEvCurrVal : public TEventLocal<TEvCurrVal, EvCurrVal> {
+            TString Database;
+            TPathId PathId;
+            TIntrusivePtr<NACLib::TUserToken> UserToken;
+
+            explicit TEvCurrVal(const TPathId& pathId)
+                : PathId(pathId)
+            { }
+
+            TEvCurrVal(const TString& database, const TPathId& pathId)
+                : Database(database)
+                , PathId(pathId)
+            { }
+        };
+
+        struct TEvCurrValResult : public TEventLocal<TEvCurrValResult, EvCurrValResult> {
+            Ydb::StatusIds::StatusCode Status;
+            NYql::TIssues Issues;
+            TPathId PathId;
+            i64 Value;
+
+            TEvCurrValResult(Ydb::StatusIds::StatusCode status, const NYql::TIssues& issues)
+                : Status(status)
+                , Issues(issues)
+            { }
+
+            TEvCurrValResult(const TPathId& pathId, i64 value)
                 : Status(Ydb::StatusIds::SUCCESS)
                 , PathId(pathId)
                 , Value(value)

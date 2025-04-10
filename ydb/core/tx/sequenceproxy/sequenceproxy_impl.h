@@ -42,6 +42,7 @@ namespace NSequenceProxy {
 
     private:
         class TAllocateActor;
+        class TGetSequenceActor;
 
         using TSequenceInfo = NSchemeCache::TSchemeCacheNavigate::TSequenceInfo;
 
@@ -49,6 +50,7 @@ namespace NSequenceProxy {
             enum EEv {
                 EvBegin = EventSpaceBegin(TKikimrEvents::ES_PRIVATE),
                 EvAllocateResult,
+                EvGetSequenceResult
             };
 
             struct TEvAllocateResult : public TEventLocal<TEvAllocateResult, EvAllocateResult> {
@@ -58,6 +60,14 @@ namespace NSequenceProxy {
                 TPathId PathId;
                 i64 Start, Increment;
                 ui64 Count;
+            };
+
+            struct TEvGetSequenceResult : public TEventLocal<TEvGetSequenceResult, EvGetSequenceResult> {
+                Ydb::StatusIds::StatusCode Status;
+                NYql::TIssues Issues;
+                ui64 TabletId;
+                TPathId PathId;
+                i64 CurrVal;
             };
         };
 
@@ -70,6 +80,13 @@ namespace NSequenceProxy {
 
     private:
         struct TNextValRequestInfo {
+            TActorId Sender;
+            ui64 Cookie;
+            TIntrusivePtr<NACLib::TUserToken> UserToken;
+            TMonotonic StartAt;
+        };
+
+        struct TCurrValRequestInfo {
             TActorId Sender;
             ui64 Cookie;
             TIntrusivePtr<NACLib::TUserToken> UserToken;
@@ -95,10 +112,13 @@ namespace NSequenceProxy {
             TList<TCachedAllocation> CachedAllocations;
             TList<TNextValRequestInfo> PendingNextValResolve;
             TList<TNextValRequestInfo> PendingNextVal;
+            TList<TCurrValRequestInfo> PendingCurrValResolve;
+            TList<TCurrValRequestInfo> PendingCurrVal;
             ui64 LastKnownTabletId = 0;
             ui64 DefaultCacheSize = 0;
             bool ResolveInProgress = false;
             bool AllocateInProgress = false;
+            bool GetSequenceInProgress = false;
             ui64 TotalCached = 0;
             ui64 TotalRequested = 0;
             ui64 TotalAllocating = 0;
@@ -128,11 +148,18 @@ namespace NSequenceProxy {
             TPathId PathId;
         };
 
+        struct TGetSequenceInFlight {
+            TString Database;
+            TPathId PathId;
+        };
+
     private:
         STFUNC(StateWork) {
             switch (ev->GetTypeRewrite()) {
                 sFunc(TEvents::TEvPoison, HandlePoison);
                 hFunc(TEvSequenceProxy::TEvNextVal, Handle);
+                hFunc(TEvSequenceProxy::TEvCurrVal, Handle);
+                hFunc(TEvPrivate::TEvGetSequenceResult, Handle);
                 hFunc(TEvPrivate::TEvAllocateResult, Handle);
                 hFunc(TEvTxProxySchemeCache::TEvNavigateKeySetResult, Handle);
             }
@@ -140,23 +167,32 @@ namespace NSequenceProxy {
 
         void HandlePoison();
         void Handle(TEvSequenceProxy::TEvNextVal::TPtr& ev);
+        void Handle(TEvSequenceProxy::TEvCurrVal::TPtr& ev);
         void Handle(TEvPrivate::TEvAllocateResult::TPtr& ev);
+        void Handle(TEvPrivate::TEvGetSequenceResult::TPtr& ev);
         void Handle(TEvTxProxySchemeCache::TEvNavigateKeySetResult::TPtr& ev);
 
         void Reply(const TNextValRequestInfo& request, Ydb::StatusIds::StatusCode status, const NYql::TIssues& issues);
         void Reply(const TNextValRequestInfo& request, const TPathId& pathId, i64 value);
+        void Reply(const TCurrValRequestInfo& request, Ydb::StatusIds::StatusCode status, const NYql::TIssues& issues);
+        void Reply(const TCurrValRequestInfo& request, const TPathId& pathId, i64 value);
         ui64 StartResolve(const TString& database, const std::variant<TString, TPathId>& path, bool syncVersion);
         ui64 StartAllocate(ui64 tabletId, const TString& database, const TPathId& pathId, ui64 cache);
+        ui64 StartGetSequence(ui64 tabletId, const TString& database, const TPathId& pathId);
         void MaybeStartResolve(const TString& database, const TString& path, TSequenceByName& info);
         void DoNextVal(TNextValRequestInfo&& request, const TString& database, const TString& path);
         void DoNextVal(TNextValRequestInfo&& request, const TString& database, const TPathId& pathId, bool needRefresh = true);
+        void DoCurrVal(TCurrValRequestInfo&& request, const TString& database, const TPathId& pathId);
         void OnResolveError(const TString& database, const TString& path, Ydb::StatusIds::StatusCode status, const NYql::TIssues& issues);
         void OnResolveError(const TString& database, const TPathId& pathId, Ydb::StatusIds::StatusCode status, const NYql::TIssues& issues);
         void OnResolveResult(const TString& database, const TString& path, TResolveResult&& result);
         void OnResolveResult(const TString& database, const TPathId& pathId, TResolveResult&& result);
-        void OnResolved(const TString& database, const TPathId& pathId, TSequenceByPathId& info, TList<TNextValRequestInfo>& resolved);
+        void OnResolved(const TString& database, const TPathId& pathId, TSequenceByPathId& info, TList<TNextValRequestInfo>& resolvedNextVal, TList<TCurrValRequestInfo>& resolvedCurrVal);
         void OnChanged(const TString& database, const TPathId& pathId, TSequenceByPathId& info);
-        bool DoMaybeReplyUnauthorized(const TNextValRequestInfo& request, const TPathId& pathId, TSequenceByPathId& info);
+
+        template <class TRequestInfo>
+        bool DoMaybeReplyUnauthorized(const TRequestInfo& request, const TPathId& pathId, TSequenceByPathId& info);
+
         bool DoReplyFromCache(const TNextValRequestInfo& request, const TPathId& pathId, TSequenceByPathId& info);
 
     private:
@@ -165,6 +201,7 @@ namespace NSequenceProxy {
         THashMap<TString, TDatabaseState> Databases;
         THashMap<ui64, TResolveInFlight> ResolveInFlight;
         THashMap<ui64, TAllocateInFlight> AllocateInFlight;
+        THashMap<ui64, TGetSequenceInFlight> GetSequenceInFlight;
         ui64 LastCookie = 0;
         TIntrusivePtr<TSequenceProxyCounters> Counters;
     };
